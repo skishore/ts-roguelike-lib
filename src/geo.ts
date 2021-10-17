@@ -190,12 +190,10 @@ const AStarHeuristic = (p: Point, los: Point[]): int => {
          AStarLOSDeltaPenalty * delta;
 };
 
-class AStarNode extends Point {
+class AStarNode {
   public popped: boolean = false;
-  constructor(x: int, y: int, public parent: AStarNode | null,
-              public distance: int, public score: int) {
-    super(x, y);
-  }
+  constructor(public point: Point, public parent: AStarNode | null,
+              public distance: int, public score: int) {}
 };
 
 // Min-heap implementation on lists of A* nodes. Nodes track indices as well.
@@ -241,19 +239,20 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
   const heap: AStarHeap = [];
 
   const score = AStarHeuristic(source, los);
-  const node = new AStarNode(source.x, source.y, null, 0, score);
-  map.set(node.key(), node);
+  const node = new AStarNode(source, null, 0, score);
+  map.set(source.key(), node);
   heap.push(node);
 
   while (heap.length > 0) {
-    const cur = AStarHeapExtractMin(heap);
+    const cur_node = AStarHeapExtractMin(heap);
+    const cur = cur_node.point;
     if (record) record.push(cur);
 
     if (cur.equal(target)) {
-      let current = cur;
+      let current = cur_node;
       const result: Point[] = [];
       while (current.parent) {
-        result.push(current);
+        result.push(current.point);
         current = current.parent;
       }
       return result.reverse();
@@ -266,7 +265,7 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
 
       const diagonal = direction.x !== 0 && direction.y !== 0;
       const occupied = test === Status.OCCUPIED;
-      const distance = cur.distance + AStarUnitCost +
+      const distance = cur_node.distance + AStarUnitCost +
                        (diagonal ? AStarDiagonalPenalty : 0) +
                        (occupied ? AStarOccupiedPenalty : 0);
 
@@ -281,10 +280,10 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
       if (existing && !existing.popped && existing.distance > distance) {
         existing.score += distance - existing.distance;
         existing.distance = distance;
-        existing.parent = cur;
+        existing.parent = cur_node;
       } else if (!existing) {
         const score = distance + AStarHeuristic(next, los);
-        const created = new AStarNode(next.x, next.y, cur, distance, score);
+        const created = new AStarNode(next, cur_node, distance, score);
         map.set(key, created);
         heap.push(created);
       }
