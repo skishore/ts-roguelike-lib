@@ -63,26 +63,26 @@ Direction.diagonal = [Direction.ne, Direction.se, Direction.sw, Direction.nw];
 
 class Matrix<T> {
   readonly size: Point;
-  #data: T[];
+  private readonly data: T[];
 
   constructor(size: Point, value: T) {
     this.size = size;
-    this.#data = Array(Point.x(size) * Point.y(size)).fill(value);
+    this.data = Array(Point.x(size) * Point.y(size)).fill(value);
   }
 
   get(point: Point): T {
     if (!this.contains(point)) throw new Error(`${point} not in ${this.size}`);
-    return this.#data[Point.x(point) + Point.x(this.size) * Point.y(point)]!;
+    return this.data[Point.x(point) + Point.x(this.size) * Point.y(point)]!;
   }
 
   set(point: Point, value: T): void {
     if (!this.contains(point)) throw new Error(`${point} not in ${this.size}`);
-    this.#data[Point.x(point) + Point.x(this.size) * Point.y(point)] = value;
+    this.data[Point.x(point) + Point.x(this.size) * Point.y(point)] = value;
   }
 
   getOrNull(point: Point): T | null {
     if (!this.contains(point)) return null;
-    return this.#data[Point.x(point) + Point.x(this.size) * Point.y(point)]!;
+    return this.data[Point.x(point) + Point.x(this.size) * Point.y(point)]!;
   }
 
   contains(point: Point): boolean {
@@ -94,7 +94,7 @@ class Matrix<T> {
   }
 
   fill(value: T): void {
-    this.#data.fill(value);
+    this.data.fill(value);
   }
 };
 
