@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "lib": ["es2017"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "outDir": "target",
+    "rootDirs": ["src", "test"],
+    "sourceMap": true,
+    "strict": true,
+    "suppressImplicitAnyIndexErrors": false,
+    "target": "es2017"
+  },
+  "compileOnSave": true,
+  "include": ["src"],
+  "exclude": ["extern"]
+}
