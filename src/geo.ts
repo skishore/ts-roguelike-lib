@@ -191,7 +191,7 @@ const AStarHeuristic = (p: Point, los: Point[]): int => {
 };
 
 class AStarNode extends Point {
-  public index: int | null = null;
+  public popped: boolean = false;
   constructor(x: int, y: int, public parent: AStarNode | null,
               public distance: int, public score: int) {
     super(x, y);
@@ -201,70 +201,24 @@ class AStarNode extends Point {
 // Min-heap implementation on lists of A* nodes. Nodes track indices as well.
 type AStarHeap = AStarNode[];
 
-const AStarHeapCheckInvariants = (heap: AStarHeap): void => {
-  return; // Comment this line out to enable debug checks.
-  heap.map(x => `(${x.index}, ${x.score})`).join('; ');
-  heap.forEach((node, index) => {
-    const debug = (label: string) => {
-      const contents = heap.map(x => `(${x.index}, ${x.score})`).join('; ');
-      return `Violated ${label} at ${index}: ${contents}`;
-    };
-    assert(node.index === index, () => debug('index'));
-    if (index === 0) return;
-    const parent_index = Math.floor((index - 1) / 2);
-    assert(heap[parent_index]!.score <= node.score, () => debug('ordering'));
-  });
-};
-
-const AStarHeapPush = (heap: AStarHeap, node: AStarNode): void => {
-  assert(node.index === null);
-  heap.push(node);
-  AStarHeapify(heap, node, heap.length - 1);
-}
-
-const AStarHeapify = (heap: AStarHeap, node: AStarNode, index: int): void => {
-  assert(0 <= index && index < heap.length);
-  const score = node.score;
-
-  while (index > 0) {
-    const parent_index = Math.floor((index - 1) / 2);
-    const parent = heap[parent_index]!;
-    if (parent.score <= score) break;
-
-    heap[index] = parent;
-    parent.index = index;
-    index = parent_index;
-  }
-
-  heap[index] = node;
-  node.index = index;
-  AStarHeapCheckInvariants(heap);
-};
-
 const AStarHeapExtractMin = (heap: AStarHeap): AStarNode => {
   assert(heap.length > 0);
-  const result = heap[0]!;
-  const node = heap.pop()!;
-  result.index = null;
-
-  if (!heap.length) return result;
-
-  let index = 0;
-  while (2 * index + 1 < heap.length) {
-    const c1 = heap[2 * index + 1]!;
-    const c2 = heap[2 * index + 2] || c1;
-    if (node.score <= Math.min(c1.score, c2.score)) break;
-
-    const child_index = 2 * index + (c1.score > c2.score ? 2 : 1);
-    const child = (c1.score > c2.score ? c2 : c1);
-    heap[index] = child;
-    child.index = index;
-    index = child_index;
+  let best_index: int | null = null;
+  let best_score = Infinity;
+  for (let i = 0; i < heap.length; i++) {
+    const score = heap[i]!.score;
+    if (score > best_score) continue;
+    best_score = score;
+    best_index = i;
   }
 
-  heap[index] = node;
-  node.index = index;
-  AStarHeapCheckInvariants(heap);
+  assert(best_index !== null);
+  const result = heap[best_index!]!;
+  const popped = heap.pop()!;
+  if (best_index! < heap.length) {
+    heap[best_index!] = popped;
+  }
+  result.popped = true;
   return result;
 };
 
@@ -288,8 +242,8 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
 
   const score = AStarHeuristic(source, los);
   const node = new AStarNode(source.x, source.y, null, 0, score);
-  AStarHeapPush(heap, node);
   map.set(node.key(), node);
+  heap.push(node);
 
   while (heap.length > 0) {
     const cur = AStarHeapExtractMin(heap);
@@ -324,16 +278,15 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
       //
       // Using such a heuristic substantially speeds up search in easy cases,
       // with the downside that we don't always find an optimal path.
-      if (existing && existing.index !== null && existing.distance > distance) {
+      if (existing && !existing.popped && existing.distance > distance) {
         existing.score += distance - existing.distance;
         existing.distance = distance;
         existing.parent = cur;
-        AStarHeapify(heap, existing, existing.index);
       } else if (!existing) {
         const score = distance + AStarHeuristic(next, los);
         const created = new AStarNode(next.x, next.y, cur, distance, score);
-        AStarHeapPush(heap, created);
         map.set(key, created);
+        heap.push(created);
       }
     }
   }
