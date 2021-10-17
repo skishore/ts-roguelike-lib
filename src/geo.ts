@@ -3,48 +3,40 @@ import {assert, int} from './lib';
 //////////////////////////////////////////////////////////////////////////////
 // Simple 2D geometry helpers.
 
-interface Point { __type__: 'Point' };
-interface PointData {readonly x: int, readonly y: int};
+// Model a point a single, 30-bit unsigned integer. The lower 15 bits are the
+// x value (plus kOffset, so that it's non-negative); the upper 15 bits are y.
+const kOffset = 1 << 14;
+const kOrigin = (kOffset << 15) + kOffset;
+
+interface Point {__type__: 'Point'};
 
 const Point = {
-  origin: {x: 0, y: 0} as unknown as Point,
-  make: (x: int, y: int) => ({x, y}) as unknown as Point,
+  origin: kOrigin as any as Point,
+  make: (x: int, y: int) => kOrigin + x + (y << 15) as any as Point,
 
-  x: (a: Point) => (a as unknown as PointData).x,
-  y: (a: Point) => (a as unknown as PointData).y,
+  x: (a: Point) => ((a as any as int) & 0x7fff) - kOffset,
+  y: (a: Point) => (a as any as int >> 15) - kOffset,
 
   add(a: Point, b: Point): Point {
-    const {x: ax, y: ay} = a as unknown as PointData;
-    const {x: bx, y: by} = b as unknown as PointData;
-    return {x: ax + bx, y: ay + by} as unknown as Point;
+    return ((a as any as int) + ((b as any as int) - kOrigin)) as any as Point;
   },
   sub(a: Point, b: Point): Point {
-    const {x: ax, y: ay} = a as unknown as PointData;
-    const {x: bx, y: by} = b as unknown as PointData;
-    return {x: ax - bx, y: ay - by} as unknown as Point;
+    return ((a as any as int) - ((b as any as int) - kOrigin)) as any as Point;
   },
-
   equal(a: Point, b: Point): boolean {
-    return (a as unknown as PointData).x === (b as unknown as PointData).x &&
-           (a as unknown as PointData).y === (b as unknown as PointData).y;
+    return (a as any as int) === (b as any as int);
   },
-
-  // An injection from Z x Z -> Z suitable for use as a Map key.
   key(point: Point): int {
-    const {x, y} = point as unknown as PointData;
-    const ax = x < 0 ? -2 * x + 1 : 2 * x;
-    const ay = y < 0 ? -2 * y + 1 : 2 * y;
-    const n = ax + ay;
-    return n * (n + 1) / 2 + ax;
+    return point as any as int;
   },
-
-  toString(point: Point): string {
-    const {x, y} = point as unknown as PointData;
+  show(point: Point): string {
+    const x = Point.x(point);
+    const y = Point.y(point);
     return `Point(${x}, ${y})`;
   },
 };
 
-interface Direction extends Point { __subtype__: 'Direction' };
+interface Direction extends Point {__subtype__: 'Direction'};
 
 const Direction = {
   none: Point.make(0, 0)   as Direction,
@@ -57,9 +49,9 @@ const Direction = {
   w:    Point.make(-1, 0)  as Direction,
   nw:   Point.make(-1, -1) as Direction,
 
-  all:      [] as Point[],
-  cardinal: [] as Point[],
-  diagonal: [] as Point[],
+  all:      [] as Direction[],
+  cardinal: [] as Direction[],
+  diagonal: [] as Direction[],
 };
 
 Direction.all = [Direction.n, Direction.ne, Direction.e, Direction.se,

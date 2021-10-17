@@ -3,6 +3,29 @@ import {Point, Matrix, AStar, Status} from './geo';
 
 //////////////////////////////////////////////////////////////////////////////
 
+const testBasicPointOperations = () => {
+  const o = Point.origin;
+  const a = Point.make(3, 4);
+  const b = Point.make(-4, 5);
+  const c = Point.make(4, -7);
+
+  assert(Point.x(o) === 0);
+  assert(Point.y(o) === 0);
+  assert(Point.x(a) === 3);
+  assert(Point.y(a) === 4);
+  assert(Point.x(b) === -4);
+  assert(Point.y(b) === 5);
+  assert(Point.x(c) === 4);
+  assert(Point.y(c) === -7);
+
+  assert(Point.x(Point.add(o, a)) === 3);
+  assert(Point.y(Point.add(o, a)) === 4);
+  assert(Point.x(Point.add(a, b)) === -1);
+  assert(Point.y(Point.add(a, b)) === 9);
+  assert(Point.x(Point.add(b, c)) === 0);
+  assert(Point.y(Point.add(b, c)) === -2);
+};
+
 const testPointKeyIsAnInjection = () => {
   const n = 100;
   const map: Map<int, Point> = new Map();
@@ -11,7 +34,7 @@ const testPointKeyIsAnInjection = () => {
     for (let y = -n; y <= n; y++) {
       const point = Point.make(x, y);
       const match = map.get(Point.key(point));
-      assert(!match, () => `Key collision: ${match}, ${point.toString()}`);
+      assert(!match, () => `Key collision: ${match}, ${Point.show(point)}`);
       map.set(Point.key(point), point);
     }
   }
@@ -198,6 +221,7 @@ Several blocks:
 //////////////////////////////////////////////////////////////////////////////
 
 const main = () => {
+  testBasicPointOperations();
   testPointKeyIsAnInjection();
   testAStar();
 };
