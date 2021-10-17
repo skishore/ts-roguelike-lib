@@ -202,9 +202,8 @@ const AStarHeuristic = (p: Point, los: Point[]): int => {
 };
 
 class AStarNode {
-  public popped: boolean = false;
   constructor(public point: Point, public parent: AStarNode | null,
-              public distance: int, public score: int) {}
+              public bits: int, public distance: int, public score: int) {}
 };
 
 // Min-heap implementation on lists of A* nodes. Nodes track indices as well.
@@ -227,7 +226,6 @@ const AStarHeapExtractMin = (heap: AStarHeap): AStarNode => {
   if (best_index! < heap.length) {
     heap[best_index!] = popped;
   }
-  result.popped = true;
   return result;
 };
 
@@ -246,11 +244,13 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
   })();
   if (free) return los.slice(1);
 
+  const kNumDirections = 8;
+  assert(kNumDirections === Direction.all.length);
   const map: Map<int, AStarNode> = new Map();
   const heap: AStarHeap = [];
 
   const score = AStarHeuristic(source, los);
-  const node = new AStarNode(source, null, 0, score);
+  const node = new AStarNode(source, null, 0, 0, score);
   map.set(Point.key(source), node);
   heap.push(node);
 
@@ -269,12 +269,17 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
       return result.reverse();
     }
 
-    for (const direction of Direction.all) {
+    for (let i = 0; i < kNumDirections; i++) {
+      const reverse_bit = 1 << ((i + kNumDirections / 2) % kNumDirections);
+      if (cur_node.bits & reverse_bit) continue;
+      const forward_bit = 1 << i;
+
+      const direction = Direction.all[i]!;
       const next = Point.add(cur, direction);
       const test = Point.equal(next, target) ? Status.FREE : check(next);
       if (test === Status.BLOCKED) continue;
 
-      const diagonal = Point.x(direction) !== 0 && Point.y(direction) !== 0;
+      const diagonal = i % 2 !== 0;
       const occupied = test === Status.OCCUPIED;
       const distance = cur_node.distance + AStarUnitCost +
                        (diagonal ? AStarDiagonalPenalty : 0) +
@@ -283,18 +288,21 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
       const key = Point.key(next);
       const existing = map.get(key);
 
-      // index !== null is a check to see if we've already popped this node
+      // The "reverse_bit unset" check excludes nodes that have been popped
       // from the heap. We need it because our heuristic is not admissible.
       //
       // Using such a heuristic substantially speeds up search in easy cases,
       // with the downside that we don't always find an optimal path.
-      if (existing && !existing.popped && existing.distance > distance) {
+      if (existing) {
+        existing.bits |= forward_bit;
+        if (existing.distance <= distance) continue;
         existing.score += distance - existing.distance;
         existing.distance = distance;
         existing.parent = cur_node;
-      } else if (!existing) {
+      } else {
+        const bits = forward_bit;
         const score = distance + AStarHeuristic(next, los);
-        const created = new AStarNode(next, cur_node, distance, score);
+        const created = new AStarNode(next, cur_node, bits, distance, score);
         map.set(key, created);
         heap.push(created);
       }
