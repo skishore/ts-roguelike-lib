@@ -9,10 +9,10 @@ const testPointKeyIsAnInjection = () => {
 
   for (let x = -n; x <= n; x++) {
     for (let y = -n; y <= n; y++) {
-      const point = new Point(x, y);
-      const match = map.get(point.key());
+      const point = Point.make(x, y);
+      const match = map.get(Point.key(point));
       assert(!match, () => `Key collision: ${match}, ${point.toString()}`);
-      map.set(point.key(), point);
+      map.set(Point.key(point), point);
     }
   }
 
@@ -36,17 +36,17 @@ const parseSearchTestCase = (input: string): SearchTestCase => {
   const label = nonnull(split[0]).replace(':', '').replace(/-/g, ' ');
   const lines = split.slice(1);
   assert(lines.length > 0);
-  const size = new Point(nonnull(lines[0]).length, lines.length);
+  const size = Point.make(nonnull(lines[0]).length, lines.length);
   const map = new Matrix(size, Status.FREE);
-  const raw = range(size.y).map(_ => range(size.x).map(_ => '.'));
+  const raw = range(Point.y(size)).map(_ => range(Point.x(size)).map(_ => '.'));
   const sources: Point[] = [];
   const targets: Point[] = [];
 
   lines.forEach((line, y) => {
-    assert(line.length === size.x);
-    for (let x = 0; x < size.x; x++) {
+    assert(line.length === Point.x(size));
+    for (let x = 0; x < Point.x(size); x++) {
       const ch = nonnull(line[x]);
-      const point = new Point(x, y);
+      const point = Point.make(x, y);
       if (ch === '.' || ch === '?' || ch === '*') continue;
       switch (ch) {
         case '@': sources.push(point); break;
@@ -74,7 +74,8 @@ const runAStarTestCase = (input: string) => {
   const {source, target, check, label, expected, raw} = test;
 
   const set = (point: Point, ch: string) => {
-    const {x, y} = point;
+    const x = Point.x(point);
+    const y = Point.y(point);
     const old = nonnull(nonnull(raw[y])[x]);
     if (old === '@' || old === 'T' || old === 'X' || old === '#') return;
     raw[y]![x] = ch;

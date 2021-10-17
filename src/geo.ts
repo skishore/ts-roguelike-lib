@@ -1,61 +1,73 @@
-import {assert, int, only} from './lib';
+import {assert, int} from './lib';
 
 //////////////////////////////////////////////////////////////////////////////
 // Simple 2D geometry helpers.
 
-class Point {
-  readonly x: int;
-  readonly y: int;
+interface Point { __type__: 'Point' };
+interface PointData {readonly x: int, readonly y: int};
 
-  static origin = new Point(0, 0);
+const Point = {
+  origin: {x: 0, y: 0} as unknown as Point,
+  make: (x: int, y: int) => ({x, y}) as unknown as Point,
 
-  constructor(x: int, y: int) {
-    this.x = x | 0;
-    this.y = y | 0;
-  }
+  x: (a: Point) => (a as unknown as PointData).x,
+  y: (a: Point) => (a as unknown as PointData).y,
 
-  add(o: Point): Point { return new Point(this.x + o.x, this.y + o.y); }
-  sub(o: Point): Point { return new Point(this.x - o.x, this.y - o.y); }
+  add(a: Point, b: Point): Point {
+    const {x: ax, y: ay} = a as unknown as PointData;
+    const {x: bx, y: by} = b as unknown as PointData;
+    return {x: ax + bx, y: ay + by} as unknown as Point;
+  },
+  sub(a: Point, b: Point): Point {
+    const {x: ax, y: ay} = a as unknown as PointData;
+    const {x: bx, y: by} = b as unknown as PointData;
+    return {x: ax - bx, y: ay - by} as unknown as Point;
+  },
 
-  equal(o: Point): boolean { return this.x === o.x && this.y === o.y; }
+  equal(a: Point, b: Point): boolean {
+    return (a as unknown as PointData).x === (b as unknown as PointData).x &&
+           (a as unknown as PointData).y === (b as unknown as PointData).y;
+  },
 
   // An injection from Z x Z -> Z suitable for use as a Map key.
-  key(): int {
-    const {x, y} = this;
+  key(point: Point): int {
+    const {x, y} = point as unknown as PointData;
     const ax = x < 0 ? -2 * x + 1 : 2 * x;
     const ay = y < 0 ? -2 * y + 1 : 2 * y;
     const n = ax + ay;
     return n * (n + 1) / 2 + ax;
-  }
+  },
 
-  toString(): string { return `Point(${this.x}, ${this.y})`; }
+  toString(point: Point): string {
+    const {x, y} = point as unknown as PointData;
+    return `Point(${x}, ${y})`;
+  },
 };
 
-class Direction extends Point {
-  static none = new Direction(0, 0);
-  static n    = new Direction(0, -1);
-  static ne   = new Direction(1, -1);
-  static e    = new Direction(1, 0);
-  static se   = new Direction(1, 1);
-  static s    = new Direction(0, 1);
-  static sw   = new Direction(-1, 1);
-  static w    = new Direction(-1, 0);
-  static nw   = new Direction(-1, -1);
+interface Direction extends Point { __subtype__: 'Direction' };
 
-  static all = [Direction.n, Direction.ne, Direction.e, Direction.se,
-                Direction.s, Direction.sw, Direction.w, Direction.nw];
+const Direction = {
+  none: Point.make(0, 0)   as Direction,
+  n:    Point.make(0, -1)  as Direction,
+  ne:   Point.make(1, -1)  as Direction,
+  e:    Point.make(1, 0)   as Direction,
+  se:   Point.make(1, 1)   as Direction,
+  s:    Point.make(0, 1)   as Direction,
+  sw:   Point.make(-1, 1)  as Direction,
+  w:    Point.make(-1, 0)  as Direction,
+  nw:   Point.make(-1, -1) as Direction,
 
-  static cardinal = [Direction.n, Direction.e, Direction.s, Direction.w];
-
-  static diagonal = [Direction.ne, Direction.se, Direction.sw, Direction.nw];
-
-  private constructor(x: int, y: int) { super(x, y); }
-
-  static assert(point: Point): Direction {
-    if (point.equal(Direction.none)) return Direction.none;
-    return only(Direction.all.filter(x => x.equal(point)));
-  }
+  all:      [] as Point[],
+  cardinal: [] as Point[],
+  diagonal: [] as Point[],
 };
+
+Direction.all = [Direction.n, Direction.ne, Direction.e, Direction.se,
+                 Direction.s, Direction.sw, Direction.w, Direction.nw];
+
+Direction.cardinal = [Direction.n, Direction.e, Direction.s, Direction.w];
+
+Direction.diagonal = [Direction.ne, Direction.se, Direction.sw, Direction.nw];
 
 class Matrix<T> {
   readonly size: Point;
@@ -63,28 +75,30 @@ class Matrix<T> {
 
   constructor(size: Point, value: T) {
     this.size = size;
-    this.#data = Array(size.x * size.y).fill(value);
+    this.#data = Array(Point.x(size) * Point.y(size)).fill(value);
   }
 
   get(point: Point): T {
     if (!this.contains(point)) throw new Error(`${point} not in ${this.size}`);
-    return this.#data[point.x + this.size.x * point.y]!;
+    return this.#data[Point.x(point) + Point.x(this.size) * Point.y(point)]!;
   }
 
   set(point: Point, value: T): void {
     if (!this.contains(point)) throw new Error(`${point} not in ${this.size}`);
-    this.#data[point.x + this.size.x * point.y] = value;
+    this.#data[Point.x(point) + Point.x(this.size) * Point.y(point)] = value;
   }
 
   getOrNull(point: Point): T | null {
     if (!this.contains(point)) return null;
-    return this.#data[point.x + this.size.x * point.y]!;
+    return this.#data[Point.x(point) + Point.x(this.size) * Point.y(point)]!;
   }
 
   contains(point: Point): boolean {
-    const {x: px, y: py} = point;
-    const {x: sx, y: sy} = this.size;
-    return 0 <= px && px < sx && 0 <= py && py < sy;
+    const px = Point.x(point);
+    if (!(0 <= px && px < Point.x(this.size))) return false;
+    const py = Point.y(point);
+    if (!(0 <= py && py < Point.y(this.size))) return false;
+    return true;
   }
 
   fill(value: T): void {
@@ -96,8 +110,10 @@ class Matrix<T> {
 // Tran-Thong symmetric line-of-sight calculation.
 
 const LOS = (a: Point, b: Point): Point[] => {
-  const {x: xa, y: ya} = a;
-  const {x: xb, y: yb} = b;
+  const xa = Point.x(a);
+  const ya = Point.y(a);
+  const xb = Point.x(b);
+  const yb = Point.y(b);
   const result: Point[] = [a];
 
   const x_diff = Math.abs(xa - xb);
@@ -117,7 +133,7 @@ const LOS = (a: Point, b: Point): Point[] => {
         y += y_sign;
         test += x_diff;
       }
-      result.push(new Point(x, y));
+      result.push(Point.make(x, y));
     }
   } else {
     test = Math.floor((y_diff + test) / 2);
@@ -128,7 +144,7 @@ const LOS = (a: Point, b: Point): Point[] => {
         x += x_sign;
         test += y_diff;
       }
-      result.push(new Point(x, y));
+      result.push(Point.make(x, y));
     }
   }
 
@@ -160,9 +176,12 @@ const AStarOccupiedPenalty = 64;
 //      diagonal steps, rather than doing all the diagonal steps first).
 //
 const AStarHeuristic = (p: Point, los: Point[]): int => {
-  const {x: px, y: py} = p;
-  const {x: sx, y: sy} = los[0]!;
-  const {x: tx, y: ty} = los[los.length - 1]!;
+  const px = Point.x(p);
+  const py = Point.y(p);
+  const sx = Point.x(los[0]!);
+  const sy = Point.y(los[0]!);
+  const tx = Point.x(los[los.length - 1]!);
+  const ty = Point.y(los[los.length - 1]!);
 
   const delta = (() => {
     const dx = tx - sx;
@@ -172,12 +191,12 @@ const AStarHeuristic = (p: Point, los: Point[]): int => {
       const index = dx > 0 ? px - sx : sx - px;
       if (index < 0) return Math.abs(px - sx) + Math.abs(py - sy);
       if (index > l) return Math.abs(px - tx) + Math.abs(py - ty);
-      return Math.abs(py - los[index]!.y);
+      return Math.abs(py - Point.y(los[index]!));
     } else {
       const index = dy > 0 ? py - sy : sy - py;
       if (index < 0) return Math.abs(px - sx) + Math.abs(py - sy);
       if (index > l) return Math.abs(px - tx) + Math.abs(py - ty);
-      return Math.abs(px - los[index]!.x);
+      return Math.abs(px - Point.x(los[index]!));
     }
   })();
 
@@ -240,7 +259,7 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
 
   const score = AStarHeuristic(source, los);
   const node = new AStarNode(source, null, 0, score);
-  map.set(source.key(), node);
+  map.set(Point.key(source), node);
   heap.push(node);
 
   while (heap.length > 0) {
@@ -248,7 +267,7 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
     const cur = cur_node.point;
     if (record) record.push(cur);
 
-    if (cur.equal(target)) {
+    if (Point.equal(cur, target)) {
       let current = cur_node;
       const result: Point[] = [];
       while (current.parent) {
@@ -259,17 +278,17 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
     }
 
     for (const direction of Direction.all) {
-      const next = cur.add(direction);
-      const test = next.equal(target) ? Status.FREE : check(next);
+      const next = Point.add(cur, direction);
+      const test = Point.equal(next, target) ? Status.FREE : check(next);
       if (test === Status.BLOCKED) continue;
 
-      const diagonal = direction.x !== 0 && direction.y !== 0;
+      const diagonal = Point.x(direction) !== 0 && Point.y(direction) !== 0;
       const occupied = test === Status.OCCUPIED;
       const distance = cur_node.distance + AStarUnitCost +
                        (diagonal ? AStarDiagonalPenalty : 0) +
                        (occupied ? AStarOccupiedPenalty : 0);
 
-      const key = next.key();
+      const key = Point.key(next);
       const existing = map.get(key);
 
       // index !== null is a check to see if we've already popped this node
