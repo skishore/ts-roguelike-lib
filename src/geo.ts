@@ -1,4 +1,4 @@
-import {assert, int, nonnull} from './lib';
+import {assert, int, only} from './lib';
 
 //////////////////////////////////////////////////////////////////////////////
 // Simple 2D geometry helpers.
@@ -53,7 +53,7 @@ class Direction extends Point {
 
   static assert(point: Point): Direction {
     if (point.equal(Direction.none)) return Direction.none;
-    return nonnull(Direction.all.filter(x => x.equal(point))[0]);
+    return only(Direction.all.filter(x => x.equal(point)));
   }
 };
 

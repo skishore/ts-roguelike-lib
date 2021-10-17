@@ -1,4 +1,4 @@
-import {assert, int, nonnull, range} from './lib';
+import {assert, bench, int, nonnull, only, range} from './lib';
 import {Point, Matrix, AStar, Status} from './geo';
 
 //////////////////////////////////////////////////////////////////////////////
@@ -11,7 +11,7 @@ const testPointKeyIsAnInjection = () => {
     for (let y = -n; y <= n; y++) {
       const point = new Point(x, y);
       const match = map.get(point.key());
-      assert(!match, () => `Point.key collision: ${match}, ${point}`);
+      assert(!match, () => `Key collision: ${match}, ${point.toString()}`);
       map.set(point.key(), point);
     }
   }
@@ -24,13 +24,17 @@ const testPointKeyIsAnInjection = () => {
 
 type SearchTestCase = {
   source: Point,
-  targets: Point[],
+  target: Point,
   check: (p: Point) => Status,
+  label: string,
+  expected: string,
   raw: string[][],
 };
 
 const parseSearchTestCase = (input: string): SearchTestCase => {
-  const lines = input.trim().split('\n');
+  const split = input.trim().split('\n');
+  const label = nonnull(split[0]).replace(':', '').replace(/-/g, ' ');
+  const lines = split.slice(1);
   assert(lines.length > 0);
   const size = new Point(nonnull(lines[0]).length, lines.length);
   const map = new Matrix(size, Status.FREE);
@@ -59,54 +63,58 @@ const parseSearchTestCase = (input: string): SearchTestCase => {
     const result = map.getOrNull(p);
     return result === null ? Status.BLOCKED : result;
   };
-
-  assert(sources.length === 1);
-  return {source: nonnull(sources[0]), targets, check, raw};
+  const source = only(sources);
+  const target = only(targets);
+  const expected = lines.join('\n');
+  return {source, target, check, label, expected, raw};
 };
 
 const runAStarTestCase = (input: string) => {
-  const expected = input.trim();
   const test = parseSearchTestCase(input);
-  assert(test.targets.length === 1);
-  const target = nonnull(test.targets[0]);
+  const {source, target, check, label, expected, raw} = test;
 
   const set = (point: Point, ch: string) => {
     const {x, y} = point;
-    const old = nonnull(nonnull(test.raw[y])[x]);
+    const old = nonnull(nonnull(raw[y])[x]);
     if (old === '@' || old === 'T' || old === 'X' || old === '#') return;
-    test.raw[y]![x] = ch;
+    raw[y]![x] = ch;
   };
 
   const seen: Point[] = [];
-  const path = nonnull(AStar(test.source, target, test.check, seen));
+  const path = nonnull(AStar(source, target, check, seen));
+  bench(label, () => AStar(source, target, check));
   seen.forEach(x => set(x, '?'));
   path.forEach(x => set(x, '*'));
 
-  const actual = test.raw.map(x => x.join('')).join('\n');
+  const actual = raw.map(x => x.join('')).join('\n');
   assert(actual === expected,
-         () => `Actual:\n\n${actual}\n\nExpected:\n\n${expected}`);
+         () => `${label}:\n\nActual:\n\n${actual}\n\nExpected:\n\n${expected}`);
 };
 
 const testAStar = () => {
   const cases = `
+-Line of sight:
 ........
 .....*T.
 ...**...
 .@*.....
 ........
 
+Occupied cells:
 ........
 ..??X...
 .@*XX*T.
 ..?**...
 ........
 
+-----Channel A:
 ...???....
 ..?####...
 .@??X...T.
 ..*####*..
 ...****...
 
+-----Channel B:
 ...****...
 .?*####*..
 ??*####.*.
@@ -115,6 +123,7 @@ const testAStar = () => {
 .??####...
 ...???....
 
+-----Channel C:
 ..????....
 .??####...
 ???####...
@@ -125,6 +134,7 @@ const testAStar = () => {
 .??####...
 ..????....
 
+-----One block:
 ..............
 ......**......
 ....?*##**T...
@@ -132,6 +142,7 @@ const testAStar = () => {
 ....??##......
 ..............
 
+Several blocks:
 .......................
 ..............##.......
 ..............##..**T..
@@ -141,6 +152,7 @@ const testAStar = () => {
 ...........##..........
 .......................
 
+--Large meadow:
 ...............#..............#.....
 .T**?.................##.......##...
 ...#*??..#............##.......##...
@@ -160,6 +172,7 @@ const testAStar = () => {
 ..........................????????@.
 ....................................
 
+--Large forest:
 .##.##..#...###.###.#...#####.....#.##.
 ...###..#*?..####...#..##..#.##.#.....#
 ######***#***?##..#.....###.#...##.....
