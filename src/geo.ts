@@ -250,17 +250,17 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
   const heap: AStarHeap = [];
 
   const score = AStarHeuristic(source, los);
-  const node = new AStarNode(source, null, 0, 0, score);
-  map.set(Point.key(source), node);
-  heap.push(node);
+  const source_node = new AStarNode(source, null, 0, 0, score);
+  map.set(Point.key(source), source_node);
+  heap.push(source_node);
 
   while (heap.length > 0) {
-    const cur_node = AStarHeapExtractMin(heap);
-    const cur = cur_node.point;
-    if (record) record.push(cur);
+    const prev_node = AStarHeapExtractMin(heap);
+    const prev = prev_node.point;
+    if (record) record.push(prev);
 
-    if (Point.equal(cur, target)) {
-      let current = cur_node;
+    if (Point.equal(prev, target)) {
+      let current = prev_node;
       const result: Point[] = [];
       while (current.parent) {
         result.push(current.point);
@@ -271,17 +271,17 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
 
     for (let i = 0; i < kNumDirections; i++) {
       const reverse_bit = 1 << ((i + kNumDirections / 2) % kNumDirections);
-      if (cur_node.bits & reverse_bit) continue;
+      if (prev_node.bits & reverse_bit) continue;
       const forward_bit = 1 << i;
 
       const direction = Direction.all[i]!;
-      const next = Point.add(cur, direction);
+      const next = Point.add(prev, direction);
       const test = Point.equal(next, target) ? Status.FREE : check(next);
       if (test === Status.BLOCKED) continue;
 
       const diagonal = i % 2 !== 0;
       const occupied = test === Status.OCCUPIED;
-      const distance = cur_node.distance + AStarUnitCost +
+      const distance = prev_node.distance + AStarUnitCost +
                        (diagonal ? AStarDiagonalPenalty : 0) +
                        (occupied ? AStarOccupiedPenalty : 0);
 
@@ -298,13 +298,13 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
         if (existing.distance <= distance) continue;
         existing.score += distance - existing.distance;
         existing.distance = distance;
-        existing.parent = cur_node;
+        existing.parent = prev_node;
       } else {
         const bits = forward_bit;
         const score = distance + AStarHeuristic(next, los);
-        const created = new AStarNode(next, cur_node, bits, distance, score);
-        map.set(key, created);
-        heap.push(created);
+        const next_node = new AStarNode(next, prev_node, bits, distance, score);
+        map.set(key, next_node);
+        heap.push(next_node);
       }
     }
   }
