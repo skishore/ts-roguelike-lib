@@ -1,5 +1,5 @@
 import {assert, bench, int, nonnull, only, range} from './lib';
-import {Point, Matrix, AStar, Status} from './geo';
+import {Point, Matrix, HashTable, AStar, Status} from './geo';
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -41,6 +41,49 @@ const testPointKeyIsAnInjection = () => {
 
   const side = 2 * n + 1;
   assert(map.size === side * side);
+};
+
+//////////////////////////////////////////////////////////////////////////////
+
+const testHashTable = () => {
+  const n = 100;
+  const table = new HashTable();
+  for (let i = 0; i < n; i++) {
+    table.set(i, i * i);
+  }
+  for (let i = 0; i < n; i++) {
+    assert(table.get(i) === i * i);
+  }
+
+  const keys: int[] = [];
+  for (let x = -n; x <= n; x++) {
+    for (let y = -n; y <= n; y++) {
+      keys.push(Point.key(Point.make(x, y)));
+    }
+  }
+
+  bench('Native Map set',  () => {
+    const table = new Map();
+    for (const key of keys) table.set(key, key / 2);
+  });
+  bench('Hash table set',  () => {
+    const table = new HashTable(2 * keys.length);
+    for (const key of keys) table.set(key, key / 2);
+  });
+
+  const t0 = new Map();
+  const t1 = new HashTable();
+  keys.forEach((key, i) => {
+    t0.set(key, i);
+    t1.set(key, i);
+  });
+
+  bench('Native Map get',  () => {
+    for (let i = 0; i < keys.length; i++) assert(t0.get(keys[i]!) === i);
+  });
+  bench('Hash table get',  () => {
+    for (let i = 0; i < keys.length; i++) assert(t1.get(keys[i]!) === i);
+  });
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -223,6 +266,7 @@ Several blocks:
 const main = () => {
   testBasicPointOperations();
   testPointKeyIsAnInjection();
+  testHashTable();
   testAStar();
 };
 

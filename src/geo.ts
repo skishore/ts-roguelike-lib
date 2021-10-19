@@ -144,6 +144,142 @@ const LOS = (a: Point, b: Point): Point[] => {
 };
 
 //////////////////////////////////////////////////////////////////////////////
+// Quick and dirty hash table mapping u32 -> u32.
+
+const kMissing = -1;
+const kTombstone = -2;
+const kMinCapacity  = 4;
+const kMaxLoadFactor = 0.75;
+const kUnusedBuffer = new Int32Array();
+
+class HashTable {
+  private size: int = -1;
+  private capacity: int = -1;
+  private max_size: int = -1;
+  private keys: Int32Array = kUnusedBuffer;
+  private vals: Int32Array = kUnusedBuffer;
+
+  constructor(target: int = 0) {
+    let capacity = kMinCapacity;
+    while (capacity < target) capacity *= 2;
+    this.init(capacity);
+  }
+
+  get(key: int): int | null {
+    assert(key >= 0);
+    const {keys, vals, capacity} = this;
+    let current = this.hash(key) & (capacity - 1);
+    for (let delta = 1; ; delta += 1) {
+      const probe = keys[current]!;
+      if (probe === key) return vals[current]!;
+      if (probe === kMissing) return null;
+      current = (current + delta) & (capacity - 1);
+    }
+  }
+
+  set(key: int, val: int): void {
+    assert(key >= 0);
+    if (this.size === this.max_size) {
+      this.rebuild(2 * this.capacity);
+    }
+    const {keys, vals, capacity} = this;
+    let current = this.hash(key) & (capacity - 1);
+    let tomb = -1;
+    for (let delta = 1; ; delta += 1) {
+      const probe = keys[current]!;
+      if (probe === key) {
+        vals[current] = val;
+        return;
+      }
+      if (probe === kMissing) break;
+      if (probe === kTombstone && tomb === -1) tomb = current;
+      current = (current + delta) & (capacity - 1);
+    }
+    const target = tomb === -1 ? current : tomb;
+    keys[target] = key;
+    vals[target] = val;
+    this.size++;
+  }
+
+  remove(key: int): void {
+    assert(key >= 0);
+    if (4 * this.size < this.max_size && this.capacity > kMinCapacity) {
+      this.rebuild(this.capacity / 2);
+    }
+    const {keys, capacity} = this;
+    let current = this.hash(key) & (capacity - 1);
+    for (let delta = 1; ; delta += 1) {
+      const probe = keys[current]!;
+      if (probe === key) {
+        keys[current] = kTombstone;
+        this.size--;
+        return;
+      }
+      if (probe === kMissing) return;
+      current = (current + delta) & (capacity - 1);
+    }
+  }
+
+  show(): string {
+    const result: [int, int][] = [];
+    const {keys, vals, capacity} = this;
+    for (let i = 0; i < capacity; i++) {
+      const key = keys[i]!;
+      if (key < 0) continue;
+      const val = vals[i]!;
+      result.push([key, val]);
+    }
+    assert(result.length === this.size);
+    result.sort((a, b) => a[0] - b[0]);
+    const terms = result.map(([key, val]) => `  ${key}: ${val}`).join('\n');
+    return `HashTable(size = ${this.size}):\n${terms}`;
+  }
+
+  private hash(key: int): int {
+    let t0 = 0, v0 = 0x9dc5;
+    let t1 = 0, v1 = 0x811c;
+
+    v0 ^= (key & 0xff);
+    t0 = v0 * 403; t1 = v1 * 403; t1 += v0<<8;
+    v1 = (t1 + (t0 >>> 16)) & 0xffff; v0 = t0 & 0xffff;
+
+    v0 ^= ((key >> 8) & 0xff);
+    t0 = v0 * 403; t1 = v1 * 403; t1 += v0<<8;
+    v1 = (t1 + (t0 >>> 16)) & 0xffff; v0 = t0 & 0xffff;
+
+    v0 ^= ((key >> 16) & 0xff);
+    t0 = v0 * 403; t1 = v1 * 403; t1 += v0<<8;
+    v1 = (t1 + (t0 >>> 16)) & 0xffff; v0 = t0 & 0xffff;
+
+    v0 ^= ((key >> 24) & 0xff);
+    t0 = v0 * 403; t1 = v1 * 403; t1 += v0<<8;
+    v1 = (t1 + (t0 >>> 16)) & 0xffff; v0 = t0 & 0xffff;
+
+    return ((v1 & 0x3fff << 16) >>> 0) + v0;
+  }
+
+  private init(capacity: int) {
+    this.size = 0;
+    this.capacity = capacity;
+    this.max_size = capacity * kMaxLoadFactor;
+    this.keys = new Int32Array(capacity);
+    this.vals = new Int32Array(capacity);
+    this.keys.fill(kMissing);
+  }
+
+  private rebuild(target: int) {
+    const {keys, vals, capacity} = this;
+    this.init(target);
+    for (let i = 0; i < capacity; i++) {
+      const key = keys[i]!;
+      if (key < 0) continue;
+      const val = vals[i]!;
+      this.set(key, val);
+    }
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////
 // A-star, for finding a path from a source to a known target.
 
 const AStarUnitCost = 16;
@@ -314,4 +450,4 @@ const AStar = (source: Point, target: Point, check: (p: Point) => Status,
 
 //////////////////////////////////////////////////////////////////////////////
 
-export {Point, Direction, Matrix, LOS, AStar, Status};
+export {Point, Direction, Matrix, LOS, HashTable, AStar, Status};
